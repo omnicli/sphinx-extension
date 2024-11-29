@@ -1,0 +1,84 @@
+up:
+  - python: 3
+  - custom:
+      name: dev dependencies
+      meet: |
+        set -eo pipefail
+        # Get the latest git tag
+        git_version=$(git describe --tags --dirty --always 2>/dev/null || echo "none")
+        # Replace the first dash by a plus
+        version=$(echo ${git_version} | sed 's/-/+/')
+        # Check if the version is in a valid format
+        if [[ "${version}" != v* ]]; then
+        version="0.0.0+${version//+/.}"
+        fi
+        # Write the version to the build version file
+        echo "__version__ = \"${version}\"" > lib/omnicli_sphinx/version.py
+        # Install the dependencies
+        pip install -e ".[dev,test]"
+        # Clean up
+        rm lib/omnicli_sphinx/version.py
+  - github-releases:
+      pypa/hatch: latest
+      astral-sh/ruff: latest
+
+env:
+  PYTHONPATH:
+    prepend:
+      - value: lib/
+        type: path
+
+commands:
+  test:
+    desc: Run all tests
+    run: |
+      set -e
+      omni test lint
+      omni test unit
+    subcommands:
+      lint:
+        desc: Run linter
+        run: ruff check lib/ tests/
+      unit:
+        desc: Run unit and integration tests
+        run: pytest --cache-clear tests/ "$@"
+
+  fix:
+    desc: Run the formatter
+    run: ruff format lib/ tests/
+
+  build:
+    desc: Build the package
+    run: |
+      set -eo pipefail
+      # Empty the build directory
+      rm -rf dist/
+      # Get the latest git tag
+      git_version=$(git describe --tags --dirty --always 2>/dev/null || echo "none")
+      # Replace the first dash by a plus
+      version=$(echo ${git_version} | sed 's/-/+/')
+      # Check if the version is in a valid format
+      if [[ "${version}" != v* ]]; then
+        version="0.0.0+${version//+/.}"
+      fi
+      # Write the version to the build version file
+      echo "__version__ = \"${version}\"" > lib/omnicli_sphinx/version.py
+      # Build the package
+      hatch build
+      # Clean up
+      rm lib/omnicli_sphinx/version.py
+
+  publish:
+    desc: Publish the package
+    run: |
+      # Get the latest git tag
+      git_version=$(git describe --tags --dirty --always)
+      clean_version=$(git describe --tags --abbrev=0)
+      # Check if the version values are the same
+      if [ "${git_version}" != "${clean_version}" ]; then
+        echo "The current version is not clean."
+        exit 1
+      fi
+
+      omni build
+      hatch publish

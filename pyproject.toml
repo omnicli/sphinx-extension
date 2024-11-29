@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "omnicli-sphinx"
+description = "Sphinx extension for documenting Omni commands"
+dynamic = ["version"]
+dependencies = [
+    "sphinx>=4.0",
+]
+requires-python = ">=3.8"
+authors = [
+  {name = "Raphaël Beamonte", email = "raphael.beamonte@gmail.com"},
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["omni", "omnicli", "sphinx", "documentation", "cli"]
+classifiers = [
+    "Framework :: Sphinx",
+    "Framework :: Sphinx :: Extension",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+]
+dev = [
+]
+ci = [
+  "pytest-clarity",
+  "pytest-subtests"
+]
+
+[project.urls]
+Homepage = "https://omnicli.dev"
+Documentation = "https://omnicli.dev"
+Repository = "https://github.com/omnicli/sphinx-extension.git"
+Issues = "https://github.com/omnicli/sphinx-extension/issues"
+Changelog = "https://github.com/omnicli/sphinx-extension/commits/main/"
+
+[tool.hatch.version]
+path = "lib/omnicli_sphinx/version.py"
+
+[tool.hatch.build]
+skip-excluded-dirs = true
+
+[tool.hatch.build.targets.sdist]
+packages = ["lib/omnicli_sphinx"]
+only-include = ["lib/omnicli_sphinx"]
+sources = ["lib"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["lib/omnicli_sphinx"]
+only-include = ["lib/omnicli_sphinx"]
+sources = ["lib"]

@@ -1,0 +1,107 @@
+name: Release next
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  bump-version:
+    name: Release next
+    runs-on: ubuntu-latest
+
+    if: github.event.ref == 'refs/heads/main'
+
+    steps:
+      - name: Create application token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        env:
+          APP_ID: ${{ secrets.OMNICLI_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.OMNICLI_PRIVATE_KEY }}
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+
+      - name: Identify last release commit
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -e
+
+          last_release_tag=$(gh --repo "${REPOSITORY}" release list --limit 1 --json tagName | jq -r '.[0].tagName')
+          if [[ "$last_release_tag" != "null" ]]; then
+            previous_tag_data=$(gh api "repos/${REPOSITORY}/git/ref/tags/${last_release_tag}")
+            previous_tag_object_type=$(echo "$previous_tag_data" | jq -r '.object.type')
+            previous_tag_object_sha=$(echo "$previous_tag_data" | jq -r '.object.sha')
+            if [[ "$previous_tag_object_type" == "tag" ]]; then
+              previous_tag_object_sha=$(gh api "repos/${REPOSITORY}/git/tags/${previous_tag_object_sha}" --jq '.object.sha')
+            fi
+            echo "PREVIOUS_TAG_SHA=${previous_tag_object_sha}" | tee -a "$GITHUB_ENV"
+
+            if [[ -z "$previous_tag_object_sha" ]]; then
+              echo >&2 "Failed to identify last release commit"
+              exit 1
+            fi
+          else
+            RELEASE_VERSION="v0.0.0"
+            echo "RELEASE_VERSION=${RELEASE_VERSION}" | tee -a "$GITHUB_ENV"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ env.RELEASE_VERSION != '' && 50 || 1 }}
+          fetch-tags: ${{ env.RELEASE_VERSION != '' && true || false }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check changed files since previous release
+        uses: tj-actions/changed-files@v45
+        id: changed-files
+        if: ${{ env.RELEASE_VERSION == '' }}
+        with:
+          base_sha: ${{ env.PREVIOUS_TAG_SHA }}
+          files_yaml: |
+            source_code:
+              - 'lib/**'
+              - 'tests/**'
+
+      - name: Check if a new release would be required
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.source_code_any_changed }}
+          DELETED_FILES: ${{ steps.changed-files.outputs.source_code_any_deleted }}
+          MODIFIED_FILES: ${{ steps.changed-files.outputs.source_code_any_modified }}
+        run: |
+          PUBLISH_RELEASE=false
+          if [[ -n "$RELEASE_VERSION" ]] || \
+               [[ "$CHANGED_FILES" == "true" ]] || \
+               [[ "$DELETED_FILES" == "true" ]] || \
+               [[ "$MODIFIED_FILES" == "true" ]]; then
+             PUBLISH_RELEASE=true
+          fi
+          echo "PUBLISH_RELEASE=${PUBLISH_RELEASE}" | tee -a "$GITHUB_ENV"
+
+      - name: Generate next release version
+        uses: jveldboom/action-conventional-versioning@v1
+        id: version
+        if: ${{ env.PUBLISH_RELEASE == 'true' && env.RELEASE_VERSION == '' }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          ignore-drafts: true
+          ignore-prereleases: true
+
+      - name: Push new tag
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION != '' && env.RELEASE_VERSION || steps.version.outputs.version-with-prefix }}
+          USER_NAME: ${{ github.actor || 'github-actions' }}
+          USER_EMAIL: ${{ github.actor || 'github-actions' }}@users.noreply.github.com
+        run: |
+          git config --local user.name "${USER_NAME}"
+          git config --local user.email "${USER_EMAIL}"
+          git tag -a "${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
+          git push origin "${RELEASE_VERSION}"
