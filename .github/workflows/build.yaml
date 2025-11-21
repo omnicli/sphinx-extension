@@ -45,7 +45,7 @@ jobs:
           echo "REQUIRES_TESTS=${REQUIRES_TESTS}" | tee -a "$GITHUB_ENV"
 
       - name: Checkout current commit
-        uses: "actions/checkout@v5"
+        uses: "actions/checkout@v6"
         if: ${{ env.REQUIRES_TESTS != 'true' }}
 
       - name: Get the changed files that would require tests
@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Run ruff
         uses: astral-sh/ruff-action@v3
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout current commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install python
         uses: actions/setup-python@v6
@@ -249,7 +249,7 @@ jobs:
           private-key: ${{ env.PRIVATE_KEY }}
 
       - name: Checkout current commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ steps.app-token.outputs.token }}
 
@@ -289,7 +289,7 @@ jobs:
 
     steps:
       - name: Checkout current commit
-        uses: "actions/checkout@v5"
+        uses: "actions/checkout@v6"
 
       - name: Install Hatch
         uses: pypa/hatch@install
